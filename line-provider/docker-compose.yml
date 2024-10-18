@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: provider_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - 5433
+    networks:
+      - bet_network
+  rabbitmq-bet:
+    image: "rabbitmq:3-management"
+    container_name: rabbitmq-bet
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    networks:
+      - bet_network
+  provider:
+    build: .
+    command: sh -c "uvicorn app.main:app --reload --port=8000 --host=0.0.0.0"
+    ports:
+      - 8885:8000
+    depends_on:
+      - db
+      - rabbitmq-bet
+    environment:
+      DATABASE_URL: postgresql+asyncpg://root:root@db:5432/provider_db
+      RABBITMQ_HOST: amqp://guest:guest@rabbitmq-bet:5672/
+    volumes:
+      - .:/app
+    networks:
+      - bet_network
+      
+volumes:
+  postgres_data:
+
+networks:
+  bet_network:
+    name: bet_network
+    driver: bridge

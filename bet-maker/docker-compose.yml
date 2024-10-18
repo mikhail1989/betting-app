@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  cons-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: bet_maker_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - 5434
+    networks:
+      - bet_network
+  bet-maker:
+    build: .
+    command: sh -c "uvicorn app.main:app --reload --port=8000 --host=0.0.0.0"
+    ports:
+      - 8886:8000
+    depends_on:
+      - cons-db
+    environment:
+      DATABASE_URL: postgresql+asyncpg://root:root@cons-db:5432/bet_maker_db
+      RABBITMQ_HOST: amqp://guest:guest@rabbitmq-bet:5672/
+    volumes:
+      - .:/app
+    networks:
+      - bet_network
+volumes:
+  postgres_data:
+
+networks:
+  bet_network:
+    name: bet_network
+    driver: bridge
