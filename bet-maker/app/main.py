@@ -36,8 +36,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/events/", response_model=EventCreate)
-async def create_event(event: EventCreate,
-                       db: AsyncSession = Depends(get_db)):
+async def create_event(event: EventCreate, db: AsyncSession = Depends(get_db)):
     """
     Create an event.
     """
@@ -53,8 +52,7 @@ async def place_bid(bid: BidCreate, db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/events/")
-async def get_active_events(db: AsyncSession = Depends(get_db),
-                            redis=Depends(get_redis)):
+async def get_active_events(db: AsyncSession = Depends(get_db), redis=Depends(get_redis)):
     """
     Get all active events.
     """
@@ -71,8 +69,7 @@ async def get_active_events(db: AsyncSession = Depends(get_db),
 
 
 @app.get("/bets/", response_model=list[BidResponse])
-async def get_bid_history(db: AsyncSession = Depends(get_db),
-                          redis=Depends(get_redis)):
+async def get_bid_history(db: AsyncSession = Depends(get_db), redis=Depends(get_redis)):
     """
     Retrieve the bid history.
     """

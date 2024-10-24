@@ -1,4 +1,3 @@
-# services.py
 from .models import Event, Bid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
