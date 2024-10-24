@@ -17,6 +17,9 @@ async_session = sessionmaker(
 )
 
 async def consume_events():
+    """
+    Consume events from a RabbitMQ queue.
+    """
     try:
         connection = await aio_pika.connect_robust(os.getenv("RABBITMQ_HOST"))
         async with connection:
@@ -37,7 +40,9 @@ async def consume_events():
         print(f"Error in consume_events: {e}")
 
 async def save_event(event_data: str):
-    print('3')
+    """
+    Save or update an event in the database.
+    """
     try:
         print(f"Processing event: {event_data}")
         event_data = json.loads(event_data)

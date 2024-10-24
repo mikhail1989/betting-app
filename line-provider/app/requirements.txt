@@ -17,4 +17,3 @@ typing-extensions==4.12.2
 uvicorn==0.31.1
 asyncpg
 aio_pika
-pytest

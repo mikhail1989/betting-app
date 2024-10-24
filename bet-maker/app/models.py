@@ -6,10 +6,12 @@ import enum
 
 Base = declarative_base()
 
+
 class EventStatus(str, enum.Enum):
     pending = "not_played"
     first_won = "won"
     second_won = "lost"
+
 
 class Event(Base):
     __tablename__ = "events"
@@ -19,6 +21,7 @@ class Event(Base):
     status = Column(Enum(EventStatus), default=EventStatus.pending)
 
     bids = relationship("Bid", back_populates="event")
+
 
 class Bid(Base):
     __tablename__ = "bids"

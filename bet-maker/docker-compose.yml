@@ -19,12 +19,19 @@ services:
     ports:
       - 8886:8000
     depends_on:
+      - redis
       - cons-db
     environment:
       DATABASE_URL: postgresql+asyncpg://root:root@cons-db:5432/bet_maker_db
       RABBITMQ_HOST: amqp://guest:guest@rabbitmq-bet:5672/
     volumes:
       - .:/app
+    networks:
+      - bet_network
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
     networks:
       - bet_network
 volumes:

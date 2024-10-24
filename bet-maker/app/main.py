@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
-from .database import  create_db, get_db
+from .database import create_db, get_db, get_redis
 from contextlib import asynccontextmanager
-from .models import Base, Event,Bid
+from .models import Base, Event, Bid
 from .schemas import EventCreate, BidCreate, BidResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -9,10 +9,15 @@ from datetime import datetime
 from sqlalchemy.future import select
 from .consumer import consume_events
 import asyncio
+import json
+from .services import create_event_service, place_bid_service, get_active_events_service, get_bid_history_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Context manager for setting up database tables and consuming events.
+    """
     print("Creating DB tables...")
     await create_db()
     print("Tables created.")
@@ -20,71 +25,65 @@ async def lifespan(app: FastAPI):
     print("Start consuming events .")
     task = asyncio.create_task(consume_events())
 
-    yield 
-    
+    yield
+
     print("Shutting down...")
-    task.cancel()  
-    await task  
+    task.cancel()
+    await task
 
 
 app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/events/", response_model=EventCreate)
-async def create_event(event: EventCreate, db: AsyncSession = Depends(get_db)):
-    new_event = Event(**event.dict())
-    db.add(new_event)
-    await db.commit()
-    await db.refresh(new_event)
+async def create_event(event: EventCreate,
+                       db: AsyncSession = Depends(get_db)):
+    """
+    Create an event.
+    """
+    return await create_event_service(event.dict(), db)
 
-    return new_event
-
-@app.get("/events/")
-async def get_active_events(db: AsyncSession = Depends(get_db)):
-    events = await db.execute(select(Event).filter(Event.deadline > datetime.utcnow()))
-    return events.scalars().all()
 
 @app.post("/bet/")
 async def place_bid(bid: BidCreate, db: AsyncSession = Depends(get_db)):
-    # Check if the event exists in the local database and is still active
-    event_query = await db.execute(select(Event).filter(Event.id == bid.event_id))
-    event = event_query.scalars().first()
+    """
+    Place a bid on an event.
+    """
+    return await place_bid_service(bid.dict(), db)
 
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
 
-    if event.deadline < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Expired event")
+@app.get("/events/")
+async def get_active_events(db: AsyncSession = Depends(get_db),
+                            redis=Depends(get_redis)):
+    """
+    Get all active events.
+    """
+    cached_events = await redis.get("all_events")
+    if cached_events:
+        print("Events from cache")
+        return json.loads(cached_events)
 
-    # Save the bid in the local database
-    new_bid = Bid(event_id=bid.event_id, amount=bid.amount)
-    db.add(new_bid)
-    await db.commit()
-    await db.refresh(new_bid)
+    events_list = await get_active_events_service(db)
 
-    return {"message": "Bid placed successfully", "bid": new_bid}
+    # Cache the events for 5 minutes (300 seconds)
+    await redis.set("all_events", json.dumps(events_list), ex=300)
+    return events_list
 
 
 @app.get("/bets/", response_model=list[BidResponse])
-async def get_bid_history(db: AsyncSession = Depends(get_db)):
-    results = await db.execute(
-        select(Bid, Event)
-        .join(Event, Bid.event_id == Event.id)
-    )
-    
-    bid_history = results.all()
+async def get_bid_history(db: AsyncSession = Depends(get_db),
+                          redis=Depends(get_redis)):
+    """
+    Retrieve the bid history.
+    """
+    cached_bids = await redis.get("all_bids")
+    if cached_bids:
+        print("Bids from cache")
+        return json.loads(cached_bids)
 
-    return [
-        {
-            "id": bid.id,
-            "amount": bid.amount,
-            "placed_at": bid.placed_at,
-            "event": {
-                "id": event.id,
-                "coef": event.coef,
-                "status": event.status,
-                "deadline": event.deadline
-            }
-        }
-        for bid, event in bid_history
-    ]
+    bids_list = await get_bid_history_service(db)
+
+    # Cache the events for 5 minutes (300 seconds)
+    await redis.set("all_bids", json.dumps(bids_list), ex=300)
+
+    return bids_list
