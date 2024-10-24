@@ -1,8 +1,10 @@
-from .models import Event, Bid
+from datetime import datetime
+
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import HTTPException
-from datetime import datetime
+
+from .models import Event, Bid
 
 
 async def create_event_service(event_data: dict, db: AsyncSession):
@@ -20,7 +22,9 @@ async def place_bid_service(bid_data: dict, db: AsyncSession):
     """
     Place a bid on an event.
     """
-    event_query = await db.execute(select(Event).filter(Event.id == bid_data['event_id']))
+    event_query = await db.execute(
+        select(Event).filter(Event.id == bid_data['event_id'])
+    )
     event = event_query.scalars().first()
 
     if event is None:
@@ -41,7 +45,9 @@ async def get_active_events_service(db: AsyncSession):
     Get all active events.
     """
     print("Events from DB")
-    result = await db.execute(select(Event).filter(Event.deadline > datetime.utcnow()))
+    result = await db.execute(
+        select(Event).filter(Event.deadline > datetime.utcnow())
+    )
     events = result.scalars().all()
     return [{
         "id": event.id,
@@ -56,8 +62,7 @@ async def get_bid_history_service(db: AsyncSession):
     Retrieve the bid history.
     """
     results = await db.execute(
-        select(Bid, Event)
-        .join(Event, Bid.event_id == Event.id)
+        select(Bid, Event).join(Event, Bid.event_id == Event.id)
     )
     print('Bids from DB')
     bid_history = results.all()
@@ -71,7 +76,7 @@ async def get_bid_history_service(db: AsyncSession):
                 "id": event.id,
                 "coef": float(event.coef),
                 "status": event.status,
-                "deadline": str(event.deadline)
+                "deadline": str(event.deadline),
             }
         }
         for bid, event in bid_history

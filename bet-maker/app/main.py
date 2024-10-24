@@ -1,16 +1,18 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends
 from .database import create_db, get_db, get_redis
 from contextlib import asynccontextmanager
-from .models import Base, Event, Bid
+from .models import Base
 from .schemas import EventCreate, BidCreate, BidResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime
-from sqlalchemy.future import select
 from .consumer import consume_events
 import asyncio
 import json
-from .services import create_event_service, place_bid_service, get_active_events_service, get_bid_history_service
+from .services import (
+    create_event_service,
+    place_bid_service,
+    get_active_events_service,
+    get_bid_history_service,
+)
 
 
 @asynccontextmanager
@@ -22,7 +24,7 @@ async def lifespan(app: FastAPI):
     await create_db()
     print("Tables created.")
 
-    print("Start consuming events .")
+    print("Start consuming events.")
     task = asyncio.create_task(consume_events())
 
     yield
@@ -30,7 +32,6 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
     task.cancel()
     await task
-
 
 app = FastAPI(lifespan=lifespan)
 
@@ -52,7 +53,10 @@ async def place_bid(bid: BidCreate, db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/events/")
-async def get_active_events(db: AsyncSession = Depends(get_db), redis=Depends(get_redis)):
+async def get_active_events(
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis)
+):
     """
     Get all active events.
     """
@@ -69,7 +73,10 @@ async def get_active_events(db: AsyncSession = Depends(get_db), redis=Depends(ge
 
 
 @app.get("/bets/", response_model=list[BidResponse])
-async def get_bid_history(db: AsyncSession = Depends(get_db), redis=Depends(get_redis)):
+async def get_bid_history(
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis)
+):
     """
     Retrieve the bid history.
     """
@@ -80,7 +87,7 @@ async def get_bid_history(db: AsyncSession = Depends(get_db), redis=Depends(get_
 
     bids_list = await get_bid_history_service(db)
 
-    # Cache the events for 5 minutes (300 seconds)
+    # Cache the bids for 5 minutes (300 seconds)
     await redis.set("all_bids", json.dumps(bids_list), ex=300)
 
     return bids_list
